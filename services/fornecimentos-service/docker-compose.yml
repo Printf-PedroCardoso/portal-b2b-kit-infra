@@ -1,0 +1,25 @@
+services:
+  fornecimentos-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portal-b2b/fornecimentos-service:1.0.0
+    container_name: portal-b2b-fornecimentos-service
+    restart: unless-stopped
+    ports:
+      - "8103:8103"
+    environment:
+      - SERVICE_NAME=fornecimentos-service
+      - PORT=8103
+      - DB_HOST=pg-primary
+      - DB_PORT=5432
+      - DB_NAME=portal_b2b
+      - DB_USER=svc_fornecimentos
+      - DB_PASSWORD=SvcFornecimentosPass2026!#
+      - KAFKA_BOOTSTRAP_SERVERS=rp-0:19092
+    networks:
+      - portal-net
+
+networks:
+  portal-net:
+    external: true

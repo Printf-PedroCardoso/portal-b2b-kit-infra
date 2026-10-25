@@ -1,0 +1,99 @@
+import os
+
+domains = [
+    ('usuarios', 'Empresas e Usuários', '/api/v1/usuarios/empresas', 'CNPJ', 'Razão Social'),
+    ('produtos', 'Catálogo de Produtos', '/api/v1/produtos', 'Nome do Produto', 'Categoria'),
+    ('fornecimentos', 'Ofertas de Fornecimento', '/api/v1/fornecimentos', 'Preço Unitário', 'Qtd Disponível'),
+    ('demanda', 'Demandas de Compra', '/api/v1/demandas', 'Quantidade', 'Preço Teto'),
+    ('negociacao', 'Negociações e Leilões', '/api/v1/negociacoes', 'ID da Negociação', 'Modo'),
+    ('pedidos', 'Gestão de Pedidos', '/api/v1/pedidos', 'ID do Pedido', 'Status'),
+    ('logistica', 'Cotação e Fretes', '/api/v1/logistica/solicitacoes', 'ID da Solicitação', 'Status')
+]
+
+template = """<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal B2B - {title}</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 2rem; background: #f8fafc; color: #1e293b; }}
+    h1 {{ color: #0f172a; border-bottom: 2px solid #cbd5e1; padding-bottom: 0.5rem; }}
+    .card {{ background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }}
+    input, button, select {{ padding: 0.5rem; margin: 0.25rem 0; font-size: 1rem; border: 1px solid #cbd5e1; border-radius: 4px; }}
+    button {{ background: #2563eb; color: white; cursor: pointer; border: none; font-weight: 600; }}
+    button:hover {{ background: #1d4ed8; }}
+    table {{ width: 100%; border-collapse: collapse; margin-top: 1rem; }}
+    th, td {{ padding: 0.75rem; text-align: left; border-bottom: 1px solid #e2e8f0; }}
+    th {{ background: #f1f5f9; }}
+    .badge {{ display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; background: #e0e7ff; color: #3730a3; }}
+  </style>
+</head>
+<body>
+  <h1>Portal B2B &mdash; {title}</h1>
+  <div class="card">
+    <h3>Cadastrar {title} (RF-13, SW-08)</h3>
+    <form id="createForm">
+      <label>{field1}:</label><br>
+      <input type="text" id="campo1" required><br>
+      <label>{field2}:</label><br>
+      <input type="text" id="campo2" required><br>
+      <button type="submit">Registrar</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>Listagem de Entidades</h3>
+    <button onclick="carregarDados()">Atualizar Listagem</button>
+    <table id="tabelaDados">
+      <thead>
+        <tr>
+          <th>Identificador</th>
+          <th>{field1}</th>
+          <th>{field2}</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tabelaCorpo">
+        <tr><td colspan="4">Carregando dados da API...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function carregarDados() {{
+      const corpo = document.getElementById('tabelaCorpo');
+      try {{
+        const resp = await fetch('{api_url}');
+        if (!resp.ok) throw new Error('Status: ' + resp.status);
+        const data = await resp.json();
+        corpo.innerHTML = '';
+        if (Array.isArray(data) && data.length > 0) {{
+          data.forEach(item => {{
+            const id = item.id || item.pedidoId || 'N/A';
+            const col1 = item.nome || item.cnpj || item.preco || item.quantidade || 'Item';
+            const col2 = item.categoria || item.razao_social || item.modo || item.status || 'Ativo';
+            const row = '<tr><td><code>' + id + '</code></td><td>' + col1 + '</td><td>' + col2 + '</td><td><span class="badge">ATIVO</span></td></tr>';
+            corpo.innerHTML += row;
+          }});
+        }} else {{
+          corpo.innerHTML = '<tr><td colspan="4">Nenhum registro encontrado.</td></tr>';
+        }}
+      }} catch (e) {{
+        corpo.innerHTML = '<tr><td colspan="4" style="color:red">Erro ao carregar dados da API: ' + e.message + '</td></tr>';
+      }}
+    }}
+    document.addEventListener('DOMContentLoaded', carregarDados);
+  </script>
+</body>
+</html>
+"""
+
+for slug, title, api_url, field1, field2 in domains:
+    target_dir = f"saida/04-poc/frontends/apps/{slug}"
+    os.makedirs(target_dir, exist_ok=True)
+    content = template.format(slug=slug, title=title, api_url=api_url, field1=field1, field2=field2)
+    with open(f"{target_dir}/index.html", "w", encoding="utf-8") as f:
+        f.write(content)
+
+print("7 front-ends gerados com sucesso!")

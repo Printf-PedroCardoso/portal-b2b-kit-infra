@@ -1,0 +1,25 @@
+services:
+  negociacao-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portal-b2b/negociacao-service:1.0.0
+    container_name: portal-b2b-negociacao-service
+    restart: unless-stopped
+    ports:
+      - "8106:8106"
+    environment:
+      - SERVICE_NAME=negociacao-service
+      - PORT=8106
+      - DB_HOST=pg-primary
+      - DB_PORT=5432
+      - DB_NAME=portal_b2b
+      - DB_USER=svc_negociacao
+      - DB_PASSWORD=SvcNegociacaoPass2026!#
+      - KAFKA_BOOTSTRAP_SERVERS=rp-0:19092
+    networks:
+      - portal-net
+
+networks:
+  portal-net:
+    external: true

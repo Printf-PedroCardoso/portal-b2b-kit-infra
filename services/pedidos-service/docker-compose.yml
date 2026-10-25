@@ -1,0 +1,25 @@
+services:
+  pedidos-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portal-b2b/pedidos-service:1.0.0
+    container_name: portal-b2b-pedidos-service
+    restart: unless-stopped
+    ports:
+      - "8107:8107"
+    environment:
+      - SERVICE_NAME=pedidos-service
+      - PORT=8107
+      - DB_HOST=pg-primary
+      - DB_PORT=5432
+      - DB_NAME=portal_b2b
+      - DB_USER=svc_pedidos
+      - DB_PASSWORD=SvcPedidosPass2026!#
+      - KAFKA_BOOTSTRAP_SERVERS=rp-0:19092
+    networks:
+      - portal-net
+
+networks:
+  portal-net:
+    external: true

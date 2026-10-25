@@ -1,0 +1,25 @@
+services:
+  mercado-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portal-b2b/mercado-service:1.0.0
+    container_name: portal-b2b-mercado-service
+    restart: unless-stopped
+    ports:
+      - "8105:8105"
+    environment:
+      - SERVICE_NAME=mercado-service
+      - PORT=8105
+      - DB_HOST=pg-primary
+      - DB_PORT=5432
+      - DB_NAME=portal_b2b
+      - DB_USER=svc_mercado
+      - DB_PASSWORD=SvcMercadoPass2026!#
+      - KAFKA_BOOTSTRAP_SERVERS=rp-0:19092
+    networks:
+      - portal-net
+
+networks:
+  portal-net:
+    external: true

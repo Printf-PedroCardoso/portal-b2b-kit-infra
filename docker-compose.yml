@@ -1,0 +1,402 @@
+# ==============================================================================
+# Docker Compose Agregador da Raiz - PoC Portal B2B Distribuído (SW-02)
+# Contém infraestrutura completa com ativo-ativo (app1 e app2), 2 servidores Postgres,
+# 3 brokers Redpanda, ferramentas administrativas e observabilidade.
+# ==============================================================================
+
+networks:
+  portal-net:
+    driver: bridge
+    name: portal-net
+
+volumes:
+  pg_primary_data:
+  pg_replica_data:
+  rp_0_data:
+  rp_1_data:
+  rp_2_data:
+  prometheus_data:
+  grafana_data:
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Banco de Dados: PostgreSQL 16 Primário e Réplica Síncrona (RFI-08, RFI-08.1)
+  # ----------------------------------------------------------------------------
+  pg-primary:
+    image: postgres:16.3-alpine
+    container_name: portal-b2b-pg-primary
+    restart: unless-stopped # SW-05
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: portal_b2b
+      POSTGRES_USER: portal_admin
+      POSTGRES_PASSWORD: ${POSTGRES_MASTER_PASSWORD:-AdminMasterPass2026!#}
+    volumes:
+      - pg_primary_data:/var/lib/postgresql/data
+      - ./database/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    command: >
+      postgres -c wal_level=replica
+               -c max_wal_senders=10
+               -c max_replication_slots=10
+               -c synchronous_commit=on
+               -c synchronous_standby_names='pg_replica'
+    networks:
+      - portal-net
+
+  pg-replica:
+    image: postgres:16.3-alpine
+    container_name: portal-b2b-pg-replica
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      PGPASSWORD: ${POSTGRES_MASTER_PASSWORD:-AdminMasterPass2026!#}
+    volumes:
+      - pg_replica_data:/var/lib/postgresql/data
+    depends_on:
+      - pg-primary
+    command: >
+      sh -c 'sleep 5 &&
+             pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U portal_admin -v -P -R -X stream || true;
+             chown -R postgres:postgres /var/lib/postgresql/data;
+             su-exec postgres postgres'
+    networks:
+      - portal-net
+
+  # ----------------------------------------------------------------------------
+  # 2. Mensageria: Cluster Redpanda com 3 Brokers (RFI-06, RFI-07, RNF-42)
+  # ----------------------------------------------------------------------------
+  rp-0:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.8
+    container_name: portal-b2b-rp-0
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --node-id=0
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://rp-0:9092,external://localhost:19092
+      - --schema-registry-addr=0.0.0.0:18081
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=rp-0:33145
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+    ports:
+      - "19092:19092"
+      - "18081:18081"
+    volumes:
+      - rp_0_data:/var/lib/redpanda/data
+    networks:
+      - portal-net
+
+  rp-1:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.8
+    container_name: portal-b2b-rp-1
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --node-id=1
+      - --seeds=rp-0:33145
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19093
+      - --advertise-kafka-addr=internal://rp-1:9092,external://localhost:19093
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=rp-1:33145
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+    depends_on:
+      - rp-0
+    volumes:
+      - rp_1_data:/var/lib/redpanda/data
+    networks:
+      - portal-net
+
+  rp-2:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.8
+    container_name: portal-b2b-rp-2
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --node-id=2
+      - --seeds=rp-0:33145
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19094
+      - --advertise-kafka-addr=internal://rp-2:9092,external://localhost:19094
+      - --rpc-addr=0.0.0.0:33145
+      - --advertise-rpc-addr=rp-2:33145
+      - --mode=dev-container
+      - --smp=1
+      - --memory=512M
+    depends_on:
+      - rp-0
+    volumes:
+      - rp_2_data:/var/lib/redpanda/data
+    networks:
+      - portal-net
+
+  # ----------------------------------------------------------------------------
+  # 3. Gateway de Borda (Nginx): Endereço Único HTTP 8080 e HTTPS 8443 (RFI-01)
+  # ----------------------------------------------------------------------------
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    image: portal-b2b/gateway:1.0.0
+    container_name: portal-b2b-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # RFI-01
+      - "8443:8443" # RFI-01, RNF-16
+    depends_on:
+      - app1-usuarios
+      - app2-usuarios
+      - frontends
+    networks:
+      - portal-net
+
+  # ----------------------------------------------------------------------------
+  # 4. Front-ends: 7 Interfaces Web Servidas por Nginx (RFI-05, RF-13, SW-08)
+  # ----------------------------------------------------------------------------
+  frontends:
+    build:
+      context: ./frontends
+      dockerfile: Dockerfile
+    image: portal-b2b/frontends:1.0.0
+    container_name: portal-b2b-frontends
+    restart: unless-stopped
+    networks:
+      - portal-net
+
+  # ----------------------------------------------------------------------------
+  # 5. Instância app1 (9 Microsserviços FastAPI) - Ativo-Ativo (RFI-02, INF-04)
+  # ----------------------------------------------------------------------------
+  app1-usuarios:
+    build: { context: ./services/usuarios-service }
+    container_name: app1-usuarios
+    restart: unless-stopped
+    environment: { SERVICE_NAME: usuarios-service, PORT: 8101, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-produtos:
+    build: { context: ./services/produtos-service }
+    container_name: app1-produtos
+    restart: unless-stopped
+    environment: { SERVICE_NAME: produtos-service, PORT: 8102, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-fornecimentos:
+    build: { context: ./services/fornecimentos-service }
+    container_name: app1-fornecimentos
+    restart: unless-stopped
+    environment: { SERVICE_NAME: fornecimentos-service, PORT: 8103, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-demanda:
+    build: { context: ./services/demanda-service }
+    container_name: app1-demanda
+    restart: unless-stopped
+    environment: { SERVICE_NAME: demanda-service, PORT: 8104, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-mercado:
+    build: { context: ./services/mercado-service }
+    container_name: app1-mercado
+    restart: unless-stopped
+    environment: { SERVICE_NAME: mercado-service, PORT: 8105, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-negociacao:
+    build: { context: ./services/negociacao-service }
+    container_name: app1-negociacao
+    restart: unless-stopped
+    environment: { SERVICE_NAME: negociacao-service, PORT: 8106, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-pedidos:
+    build: { context: ./services/pedidos-service }
+    container_name: app1-pedidos
+    restart: unless-stopped
+    environment: { SERVICE_NAME: pedidos-service, PORT: 8107, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-logistica:
+    build: { context: ./services/logistica-service }
+    container_name: app1-logistica
+    restart: unless-stopped
+    environment: { SERVICE_NAME: logistica-service, PORT: 8108, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  app1-transportadoras:
+    build: { context: ./services/transportadoras-service }
+    container_name: app1-transportadoras
+    restart: unless-stopped
+    environment: { SERVICE_NAME: transportadoras-service, PORT: 8109, INSTANCE: app1, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-0:9092" }
+    networks: [portal-net]
+
+  # ----------------------------------------------------------------------------
+  # 6. Instância app2 (9 Microsserviços FastAPI) - Ativo-Ativo (RFI-02, INF-04)
+  # ----------------------------------------------------------------------------
+  app2-usuarios:
+    build: { context: ./services/usuarios-service }
+    container_name: app2-usuarios
+    restart: unless-stopped
+    environment: { SERVICE_NAME: usuarios-service, PORT: 8101, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-produtos:
+    build: { context: ./services/produtos-service }
+    container_name: app2-produtos
+    restart: unless-stopped
+    environment: { SERVICE_NAME: produtos-service, PORT: 8102, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-fornecimentos:
+    build: { context: ./services/fornecimentos-service }
+    container_name: app2-fornecimentos
+    restart: unless-stopped
+    environment: { SERVICE_NAME: fornecimentos-service, PORT: 8103, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-demanda:
+    build: { context: ./services/demanda-service }
+    container_name: app2-demanda
+    restart: unless-stopped
+    environment: { SERVICE_NAME: demanda-service, PORT: 8104, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-mercado:
+    build: { context: ./services/mercado-service }
+    container_name: app2-mercado
+    restart: unless-stopped
+    environment: { SERVICE_NAME: mercado-service, PORT: 8105, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-negociacao:
+    build: { context: ./services/negociacao-service }
+    container_name: app2-negociacao
+    restart: unless-stopped
+    environment: { SERVICE_NAME: negociacao-service, PORT: 8106, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-pedidos:
+    build: { context: ./services/pedidos-service }
+    container_name: app2-pedidos
+    restart: unless-stopped
+    environment: { SERVICE_NAME: pedidos-service, PORT: 8107, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-logistica:
+    build: { context: ./services/logistica-service }
+    container_name: app2-logistica
+    restart: unless-stopped
+    environment: { SERVICE_NAME: logistica-service, PORT: 8108, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  app2-transportadoras:
+    build: { context: ./services/transportadoras-service }
+    container_name: app2-transportadoras
+    restart: unless-stopped
+    environment: { SERVICE_NAME: transportadoras-service, PORT: 8109, INSTANCE: app2, DB_HOST: pg-primary, KAFKA_BOOTSTRAP_SERVERS: "rp-1:9092" }
+    networks: [portal-net]
+
+  # ----------------------------------------------------------------------------
+  # 7. Ferramentas Administrativas Protegidas em 127.0.0.1 (RFI-13.1, RFI-13.2, RNF-21)
+  # ----------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:8.8
+    container_name: portal-b2b-pgadmin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5050:80" # RNF-21: Somente localhost
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@portalb2b.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-AdminPgLocal123!#}
+    networks:
+      - portal-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: portal-b2b-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8080" # RNF-21: Somente localhost
+    environment:
+      KAFKA_CLUSTERS_0_NAME: redpanda-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: rp-0:9092,rp-1:9092,rp-2:9092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://rp-0:18081
+    networks:
+      - portal-net
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.13
+    container_name: portal-b2b-uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001" # RNF-21: Somente localhost
+    networks:
+      - portal-net
+
+  # ----------------------------------------------------------------------------
+  # 8. Observabilidade: Métricas, Logs e Tracing (RNF-29 a RNF-35)
+  # ----------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: portal-b2b-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observabilidade/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observabilidade/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - portal-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: portal-b2b-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observabilidade/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - portal-net
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: portal-b2b-grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000" # RNF-21
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-AdminGrafanaLocal123!#}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - portal-net
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: portal-b2b-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - portal-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: portal-b2b-jaeger
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:16686:16686" # RNF-21
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    networks:
+      - portal-net

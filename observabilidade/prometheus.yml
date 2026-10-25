@@ -1,0 +1,44 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: "portal-b2b-gateway"
+    static_configs:
+      - targets: ["gateway:8080"]
+
+  - job_name: "microsservicos-app1"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "app1-usuarios:8101"
+          - "app1-produtos:8102"
+          - "app1-fornecimentos:8103"
+          - "app1-demanda:8104"
+          - "app1-mercado:8105"
+          - "app1-negociacao:8106"
+          - "app1-pedidos:8107"
+          - "app1-logistica:8108"
+          - "app1-transportadoras:8109"
+
+  - job_name: "microsservicos-app2"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "app2-usuarios:8101"
+          - "app2-produtos:8102"
+          - "app2-fornecimentos:8103"
+          - "app2-demanda:8104"
+          - "app2-mercado:8105"
+          - "app2-negociacao:8106"
+          - "app2-pedidos:8107"
+          - "app2-logistica:8108"
+          - "app2-transportadoras:8109"

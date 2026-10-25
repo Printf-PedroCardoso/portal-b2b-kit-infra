@@ -1,0 +1,22 @@
+groups:
+  - name: portal_b2b_alerts
+    rules:
+      # RNF-35: Alerta automático "serviço fora > 30 s"
+      - alert: ServicoForaDoAr
+        expr: up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instância de microsserviço fora do ar"
+          description: "O serviço {{ $labels.instance }} está inacessível há mais de 30 segundos (RNF-35)."
+
+      # RNF-33: Consumer lag > 1000 por 2 min
+      - alert: KafkaConsumerLagAlto
+        expr: kafka_consumer_lag > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer Lag elevado no Redpanda"
+          description: "O consumidor {{ $labels.group }} está defasado em mais de 1000 eventos por 2 minutos (RNF-33)."

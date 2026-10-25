@@ -1,0 +1,27 @@
+# Docker Compose individual por serviço (SW-02)
+services:
+  usuarios-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: portal-b2b/usuarios-service:1.0.0
+    container_name: portal-b2b-usuarios-service
+    restart: unless-stopped # SW-05
+    ports:
+      - "8101:8101" # SW-04
+    environment:
+      - SERVICE_NAME=usuarios-service
+      - PORT=8101
+      - DB_HOST=pg-primary
+      - DB_PORT=5432
+      - DB_NAME=portal_b2b
+      - DB_USER=svc_usuarios
+      - DB_PASSWORD=SvcUsuariosPass2026!#
+      - KAFKA_BOOTSTRAP_SERVERS=rp-0:19092
+      - JWT_SECRET_KEY=chave-secreta-poc-portal-b2b-super-segura-2026
+    networks:
+      - portal-net
+
+networks:
+  portal-net:
+    external: true

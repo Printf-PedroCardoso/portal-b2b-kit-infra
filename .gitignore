@@ -1,0 +1,15 @@
+# Gitignore - Kit de Integração da Infraestrutura
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+Thumbs.db
+*.log
+.venv/
+env/
+venv/

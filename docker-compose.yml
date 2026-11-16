@@ -35,12 +35,18 @@ services:
     volumes:
       - pg_primary_data:/var/lib/postgresql/data
       - ./database/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
-    command: >
-      postgres -c wal_level=replica
-               -c max_wal_senders=10
-               -c max_replication_slots=10
-               -c synchronous_commit=on
-               -c synchronous_standby_names='pg_replica'
+    
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - synchronous_standby_names=FIRST 1 (walreceiver)
+
     networks:
       - portal-net
 
@@ -56,11 +62,19 @@ services:
       - pg_replica_data:/var/lib/postgresql/data
     depends_on:
       - pg-primary
+    
     command: >
-      sh -c 'sleep 5 &&
-             pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U portal_admin -v -P -R -X stream || true;
-             chown -R postgres:postgres /var/lib/postgresql/data;
-             su-exec postgres postgres'
+      sh -c '
+        set -e;
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          until pg_isready -h pg-primary -p 5432; do sleep 2; done;
+          pg_basebackup -h pg-primary -D /var/lib/postgresql/data -U portal_admin -v -P -R -X stream;
+        fi;
+        chown -R postgres:postgres /var/lib/postgresql/data;
+        chmod 700 /var/lib/postgresql/data;
+        exec su-exec postgres postgres
+      '
+
     networks:
       - portal-net
 

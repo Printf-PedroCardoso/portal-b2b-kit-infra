@@ -25,6 +25,10 @@ TOPICS=(
   "solicitacao_frete_criada"
   "cotacao_recebida"
   "frete_selecionado"
+  # Tópicos de governança e segurança do Identity-Service (issue #2)
+  "tenant_bloqueado"
+  "usuario_bloqueado"
+  "sessao_comprometida"
 )
 
 DLT_TOPICS=(

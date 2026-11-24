@@ -354,6 +354,24 @@ services:
       - portal-net
 
   # ----------------------------------------------------------------------------
+  # 7.1 Redis: Denylist de Tokens para revogação imediata no logout (issue #2)
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7.4.6-alpine
+    container_name: portal_b2b_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy volatile-lru
+    networks:
+      - portal-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ----------------------------------------------------------------------------
   # 8. Observabilidade: Métricas, Logs e Tracing (RNF-29 a RNF-35)
   # ----------------------------------------------------------------------------
   prometheus:

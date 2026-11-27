@@ -13,3 +13,13 @@ Thumbs.db
 .venv/
 env/
 venv/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfplan
+crash.log
+.bin/

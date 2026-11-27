@@ -1,0 +1,9 @@
+# Exemplo de variáveis para o ambiente de produção (PROD)
+# R3: Proibido segredos reais! Preencha com valores locais antes do apply.
+aws_region        = "us-east-2"
+project_name      = "portal-b2b"
+domain_name       = "portal.b2b.com.br"
+db_admin_password = "DefinaSenhaForteMasterProd123!#"
+db_ddl_password   = "DefinaSenhaForteDDLProd123!#"
+jwt_secret_key    = "defina-chave-jwt-segura-prod-64chars-long-hex"
+alert_email       = "noc-alertas@portalb2b.com.br"

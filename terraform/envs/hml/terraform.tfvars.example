@@ -1,0 +1,9 @@
+# Exemplo de variáveis para o ambiente de homologação (HML)
+# R3: Proibido segredos reais! Preencha com valores locais antes do apply.
+aws_region        = "us-east-2"
+project_name      = "portal-b2b"
+domain_name       = "hml.b2b.local"
+db_admin_password = "ExemploSenhaMasterHML123!#"
+db_ddl_password   = "ExemploSenhaDDLHML123!#"
+jwt_secret_key    = "exemplo-chave-jwt-segura-hml-32chars"
+alert_email       = "hml-alertas@portalb2b.local"

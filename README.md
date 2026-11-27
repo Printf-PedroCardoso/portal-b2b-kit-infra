@@ -25,6 +25,14 @@ Este repositório contém toda a **fundação compartilhada de infraestrutura lo
 
 ```text
 kit-integracao-infraestrutura/
+├── terraform/                      # Infraestrutura AWS como Código (IaC) — mantida pela equipe de Infra
+│   ├── envs/                       # Ambientes AWS: integracao, hml e prod
+│   ├── modules/                    # Módulos Terraform (network, security, compute_app, compute_msg, rds, alb, ...)
+│   ├── scripts/                    # Scripts de bootstrap EC2 (user_data_app.sh, user_data_msg.sh)
+│   └── README.md                   # Guia de provisionamento Terraform na AWS
+├── docs/                           # Documentação técnica da arquitetura AWS
+│   ├── arquitetura-aws.md          # Especificação completa da arquitetura em nuvem
+│   └── guia-iniciante-aws.md       # Guia passo a passo para operar o ambiente AWS
 ├── database/
 │   └── 01-init.sql                 # Script de criação dos 9 schemas e roles no PostgreSQL
 ├── gateway/
@@ -172,10 +180,17 @@ Para garantir que o trabalho de uma equipe não quebre o das outras:
 
 ---
 
-## 7. Documentação Completa e Detalhada
+## 7. Documentação Completa e Infraestrutura AWS (Terraform)
 
 - Para ler o manual completo de arquitetura com detalhes de BDD, fluxos de negócio, regras de RBAC e LGPD, leia o arquivo [**`ORIENTACOES-ARQUITETURA-GRUPOS.md`**](ORIENTACOES-ARQUITETURA-GRUPOS.md).
 - Para consultar o catálogo dos 18 tópicos e os exemplos de payloads JSON de cada evento, leia o arquivo [**`CONTRACTS.md`**](CONTRACTS.md).
+- Para consultar a especificação da infraestrutura em nuvem AWS e o guia de operação, veja:
+  - [**`terraform/README.md`**](terraform/README.md) — módulos Terraform, pré-requisitos e comandos de `plan`/`apply`;
+  - [**`docs/arquitetura-aws.md`**](docs/arquitetura-aws.md) — arquitetura detalhada na AWS;
+  - [**`docs/guia-iniciante-aws.md`**](docs/guia-iniciante-aws.md) — guia passo a passo de provisionamento e controle de custos.
+
+> [!NOTE]
+> **Para os grupos de desenvolvimento:** a pasta `terraform/` é utilizada exclusivamente pela **Equipe de Infraestrutura** para provisionar os ambientes na AWS (`integracao`, `hml`, `prod`). Vocês **não precisam** instalar Terraform nem alterar nada dentro dela para desenvolver e testar localmente com Docker Compose.
 
 ---
 

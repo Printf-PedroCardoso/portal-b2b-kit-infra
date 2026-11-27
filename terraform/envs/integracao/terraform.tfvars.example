@@ -1,0 +1,9 @@
+# Exemplo de variáveis para o ambiente de integracao
+# R3: Proibido segredos reais! Preencha com valores locais antes do apply.
+aws_region        = "us-east-2"
+project_name      = "portal-b2b"
+domain_name       = "integracao.b2b.local"
+db_admin_password = "ExemploSenhaMaster123!#"
+db_ddl_password   = "ExemploSenhaDDL123!#"
+jwt_secret_key    = "exemplo-chave-jwt-segura-32-chars-long"
+alert_email       = "integracao-alertas@portalb2b.local"

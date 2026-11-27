@@ -1,0 +1,13 @@
+# ==============================================================================
+# Exemplo de Backend Remoto para Ambiente de Homologação (HML)
+# ==============================================================================
+
+terraform {
+  backend "s3" {
+    bucket         = "portal-b2b-terraform-state-hml"
+    key            = "hml/terraform.tfstate"
+    region         = "us-east-2"
+    dynamodb_table = "portal-b2b-terraform-locks-hml"
+    encrypt        = true
+  }
+}

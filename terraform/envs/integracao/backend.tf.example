@@ -1,0 +1,14 @@
+# ==============================================================================
+# Exemplo de Configuração de Backend Remoto S3 com DynamoDB Lock (INF-11, RES-10)
+# Para ativar: renomeie este arquivo para backend.tf e configure o bucket S3 real
+# ==============================================================================
+
+terraform {
+  backend "s3" {
+    bucket         = "portal-b2b-terraform-state-integracao"
+    key            = "integracao/terraform.tfstate"
+    region         = "us-east-2"
+    dynamodb_table = "portal-b2b-terraform-locks-integracao"
+    encrypt        = true
+  }
+}

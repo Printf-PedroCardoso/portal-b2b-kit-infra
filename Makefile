@@ -10,13 +10,13 @@ help:
 	@echo "   KIT DE INTEGRAÇÃO DA INFRAESTRUTURA — COMANDOS RÁPIDOS"
 	@echo "========================================================================"
 	@echo "  make env           Copia .env.example para .env (primeiro passo)"
-	@echo "  make infra-up      Sobe APENAS a infraestrutura base (Postgres, Redpanda, Gateway e UIs)"
+	@echo "  make infra-up      Sobe APENAS a infraestrutura base (Postgres, Redpanda, Redis, Gateway e UIs)"
 	@echo "  make infra-down    Derruba a infraestrutura base"
 	@echo "  make up            Sobe a infraestrutura E todos os 9 microsserviços simulados"
 	@echo "  make down          Derruba todos os containers da stack"
 	@echo "  make ps            Exibe o status dos containers"
 	@echo "  make logs          Exibe os logs em tempo real (Ctrl+C para sair)"
-	@echo "  make init-topics   Cria/Verifica os 15 tópicos oficiais no Redpanda"
+	@echo "  make init-topics   Cria/Verifica os 18 tópicos oficiais no Redpanda"
 	@echo "========================================================================"
 
 env:
@@ -29,8 +29,8 @@ env:
 	fi
 
 infra-up: env
-	@echo "==> Inicializando APENAS infraestrutura base (Postgres, Redpanda, Gateway, PgAdmin, Kafka UI)..."
-	docker compose up -d pg-primary rp-0 rp-1 rp-2 gateway pgadmin kafka-ui frontends
+	@echo "==> Inicializando APENAS infraestrutura base (Postgres, Redpanda, Redis, Gateway, PgAdmin, Kafka UI)..."
+	docker compose up -d pg-primary rp-0 rp-1 rp-2 redis gateway pgadmin kafka-ui frontends
 	@echo "==> Aguardando estabilização dos serviços (10s)..."
 	@sleep 10
 	@bash ./scripts/init_topics.sh
@@ -41,11 +41,12 @@ infra-up: env
 	@echo "  - PgAdmin:          http://localhost:5050 (login no .env)"
 	@echo "  - Redpanda Kafka:   localhost:19092"
 	@echo "  - Kafka UI:         http://localhost:8090"
+	@echo "  - Redis (Denylist): localhost:6379"
 	@echo "========================================================================"
 
 infra-down:
 	@echo "==> Encerrando serviços de infraestrutura..."
-	docker compose stop pg-primary rp-0 rp-1 rp-2 gateway pgadmin kafka-ui frontends
+	docker compose stop pg-primary rp-0 rp-1 rp-2 redis gateway pgadmin kafka-ui frontends
 
 up: env
 	@echo "==> Inicializando toda a stack completa (Infraestrutura + 9 Microsserviços)..."

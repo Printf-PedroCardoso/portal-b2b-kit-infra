@@ -30,7 +30,7 @@ A tabela a seguir consolida os grupos de trabalho (conforme distribuição ofici
 | **6. Banco de Dados** | Rafael Borba, Rafaella Agapito, Leonardo Oliveira, João Pedro Lima, Marcus Vinícius Silva | Modelagem relacional, DDL versionado, Roles, Trilha de auditoria, Migrações e Pools | `5432` | Banco `portal_b2b`<br>(9 Schemas) |
 | **7. UX / UI** | Eduardo Souza Andrade, Hugo Guilherme | 7 Front-ends estáticos (HTML5/React/Vite) e Design System unificado | Borda (Nginx) | — |
 | **8. Teste e Qualidade** | Amanda Barbosa, Kayky Momoli, Lavínia Moreira, Gabriel Jonas, Matheus Pains, Igor Santos, Nicole Gomes, Igor Balduíno | Suíte independente de testes funcionais, integração, carga (k6) e caos | — | — |
-| **9. Infraestrutura e DevOps** | Pedro Cardoso da Mata, Antoniel Brito Andrade, Flaelisnanda Oliveira Dacio | Gateway Nginx, Nuvem AWS (Terraform), Cluster Redpanda, Observabilidade e CI/CD | `8080` (GW)<br>`19092` (Kafka) | Gestão Geral |
+| **9. Infraestrutura e DevOps** | Pedro Cardoso da Mata, Antoniel Brito Andrade, Flaelisnanda Oliveira Dacio | Gateway Nginx, Nuvem AWS (Terraform), Cluster Redpanda, Redis (denylist), Observabilidade e CI/CD | `8080` (GW)<br>`19092` (Kafka)<br>`6379` (Redis) | Gestão Geral |
 
 ---
 
@@ -61,7 +61,7 @@ flowchart TB
   end
 
   subgraph Mensageria["Barramento Orientado a Eventos (Cluster Redpanda)"]
-    KafkaCluster["3 Brokers Redpanda (rp-0, rp-1, rp-2)\n- Fator de Replicação: 3\n- Quórum Raft (API Apache Kafka na porta 19092)\n- 15 Tópicos de Negócio"]
+    KafkaCluster["3 Brokers Redpanda (rp-0, rp-1, rp-2)\n- Fator de Replicação: 3\n- Quórum Raft (API Apache Kafka na porta 19092)\n- 18 Tópicos Oficiais (15 Negócio + 3 Governança/Identity)"]
   end
 
   subgraph Persistencia["Camada de Dados (PostgreSQL 16)"]
@@ -109,7 +109,8 @@ Esta seção aplica-se aos grupos de **Autenticação**, **Fornecimento e Produt
 ### 4.1 Padrão de Endpoints REST
 - Todas as rotas de negócio devem obrigatoriamente iniciar com o prefixo versionado: `/api/v1/<servico>`.
   - Exemplo: `POST /api/v1/demandas`, `GET /api/v1/produtos`, `POST /api/v1/negociacoes/{id}/lances`.
-- **Nenhum serviço deve expor rotas fora de `/api/v1/`**, exceto endpoints técnicos (`/health`, `/metrics`, `/docs`).
+  - Para o `usuarios-service` (Identity-Service), o Gateway também roteia os prefixos `/api/v1/auth/`, `/api/v1/tenants` e `/api/v1/users/`.
+- **Nenhum serviço deve expor rotas fora de `/api/v1/`**, exceto endpoints técnicos (`/health`, `/metrics`, `/docs` e `/.well-known/jwks.json` no Identity-Service).
 
 ### 4.2 Endpoints Técnicos Obrigatórios em TODAS as APIs
 Cada um dos 9 microsserviços deve implementar impreterivelmente os seguintes endpoints na raiz:
@@ -340,12 +341,13 @@ A suíte do Grupo de Teste deve reprovar qualquer serviço que viole os seguinte
 Para facilitar a vida de todos os alunos e garantir que ninguém perca tempo configurando bancos ou brokers do zero, a **Equipe de Infraestrutura empacotou um repositório completo e autocontido chamado `kit-integracao-infraestrutura/`**, pronto para ser clonado e utilizado por todas as equipes.
 
 ### 11.1 O que o Kit Entrega para o seu Grupo
-1. **Banco de Dados PostgreSQL 16 Pré-configurado:** Com o banco `portal_b2b`, os 9 schemas já criados e as credenciais DML isoladas para cada equipe (arquivo `database/01-init.sql`).
-2. **Cluster Redpanda Pronto:** 3 brokers Kafka na porta `19092` com script automatizado (`scripts/init_topics.sh`) para criar os 15 tópicos oficiais.
-3. **Gateway de Borda Nginx:** Roteamento de rotas `/api/v1/*`, terminação TLS e rate limiting já ativos na porta `8080`.
-4. **Painéis Visuais Web:** PgAdmin na porta `5050` e Kafka UI na porta `8090` para monitoramento em tempo real.
-5. **Boilerplates de Microsserviços (`services/*`):** Esqueleto funcional de cada uma das 9 APIs em FastAPI, já com Dockerfile, endpoints `/health`, `/metrics`, documentação Swagger (`/docs`) e o tratamento padronizado de erros RFC 7807.
-6. **Catálogo de Contratos e Payloads (`CONTRACTS.md`):** Exemplos dos payloads JSON para todos os 15 tópicos de mensagens.
+1. **Banco de Dados PostgreSQL 16 Pré-configurado:** Com o banco `portal_b2b`, os 9 schemas já criados e as credenciais DML isoladas para cada equipe (arquivo `database/01-init.sql`, incluindo `ALTER DEFAULT PRIVILEGES` para objetos futuros criados por `portal_ddl`).
+2. **Cluster Redpanda Pronto:** 3 brokers Kafka na porta `19092` com script automatizado (`scripts/init_topics.sh`) para criar os 18 tópicos oficiais (15 de negócio + 3 de governança do Identity-Service: `tenant_bloqueado`, `usuario_bloqueado`, `sessao_comprometida`).
+3. **Gateway de Borda Nginx:** Roteamento de rotas `/api/v1/*` (incluindo `/api/v1/auth/`, `/api/v1/tenants`, `/api/v1/users/` e `/.well-known/jwks.json`), terminação TLS e rate limiting já ativos na porta `8080`.
+4. **Redis para Denylist de Tokens:** Instância `redis:7.4.6-alpine` na porta `6379` (AOF, `maxmemory 256mb`, política `volatile-lru`) para revogação imediata no logout do Identity-Service.
+5. **Painéis Visuais Web:** PgAdmin na porta `5050` e Kafka UI na porta `8090` para monitoramento em tempo real.
+6. **Boilerplates de Microsserviços (`services/*`):** Esqueleto funcional de cada uma das 9 APIs em FastAPI, já com Dockerfile, endpoints `/health`, `/metrics`, documentação Swagger (`/docs`) e o tratamento padronizado de erros RFC 7807.
+7. **Catálogo de Contratos e Payloads (`CONTRACTS.md`):** Exemplos dos payloads JSON para os tópicos de mensagens.
 
 ### 11.2 Como Inicializar a Infraestrutura no seu Computador
 Dentro da pasta do Kit, você pode utilizar o `Makefile` incluído ou comandos diretos do Docker:
@@ -355,9 +357,9 @@ Dentro da pasta do Kit, você pode utilizar o `Makefile` incluído ou comandos d
 make env
 # (Ou: cp .env.example .env)
 
-# 2. Inicializar a infraestrutura base (Postgres + Redpanda + Gateway + UIs)
+# 2. Inicializar a infraestrutura base (Postgres + Redpanda + Redis + Gateway + UIs)
 make infra-up
-# (Ou: docker compose up -d pg-primary rp-0 rp-1 rp-2 gateway pgadmin kafka-ui frontends)
+# (Ou: docker compose up -d pg-primary rp-0 rp-1 rp-2 redis gateway pgadmin kafka-ui frontends)
 ```
 
 ### 11.3 Duas Formas de Desenvolver o seu Microsserviço
@@ -368,8 +370,9 @@ make infra-up
 - **Gateway Oficial da Plataforma:** `http://localhost:8080` (todas as APIs e front-ends respondem aqui).
 - **PostgreSQL 16:** `localhost:5432` (Banco: `portal_b2b`, Usuário Admin: `portal_admin`).
 - **PgAdmin (Interface Web do Banco):** `http://localhost:5050` (Login: `admin@portalb2b.local` / Senha: `AdminPgLocal123!#`).
-- **Kafka UI (Interface dos Tópicos e Mensagens):** `http://localhost:8090` (Monitore todas as mensagens que trafegam em tempo real nos 15 tópicos).
+- **Kafka UI (Interface dos Tópicos e Mensagens):** `http://localhost:8090` (Monitore todas as mensagens que trafegam em tempo real nos 18 tópicos).
 - **Cluster Redpanda (Conexão direta de clientes Kafka):** `localhost:19092`.
+- **Redis (Denylist de Tokens — Identity-Service):** `localhost:6379`.
 
 ---
 

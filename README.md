@@ -10,9 +10,10 @@
 Este repositório contém toda a **fundação compartilhada de infraestrutura local** preparada pela Equipe de Infraestrutura para todos os 9 grupos de trabalho do projeto integrado do **Portal B2B Distribuído**.
 
 ### O que já está pronto para uso:
-- **Banco de Dados Relacional:** PostgreSQL 16 com o banco `portal_b2b`, particionado em **9 schemas estanques** e roles `svc_*` com permissões DML de privilégio mínimo.
-- **Barramento de Mensageria:** Cluster **Redpanda de 3 brokers** (compatível 100% com a API Apache Kafka) na porta `19092`, com os **15 tópicos oficiais de negócio** pré-configurados.
-- **Ponto Único de Borda:** **Gateway Nginx** na porta `8080` (HTTP) e `8443` (HTTPS com TLS), roteando tráfego para APIs (`/api/v1/*`) e interfaces web, com controle de vazão (*rate limiting*) e injeção do cabeçalho `X-Correlation-Id`.
+- **Banco de Dados Relacional:** PostgreSQL 16 com o banco `portal_b2b`, particionado em **9 schemas estanques** e roles `svc_*` com permissões DML de privilégio mínimo (incluindo `ALTER DEFAULT PRIVILEGES` para objetos futuros criados por `portal_ddl`).
+- **Barramento de Mensageria:** Cluster **Redpanda de 3 brokers** (compatível 100% com a API Apache Kafka) na porta `19092`, com os **18 tópicos oficiais** pré-configurados (15 de negócio + 3 de governança do Identity-Service).
+- **Redis (Denylist de Tokens):** Instância `redis:7.4.6-alpine` na porta `6379` (AOF, `maxmemory 256mb`, política `volatile-lru`) para revogação imediata de tokens no logout do Identity-Service.
+- **Ponto Único de Borda:** **Gateway Nginx** na porta `8080` (HTTP) e `8443` (HTTPS com TLS), roteando tráfego para APIs (`/api/v1/*`, incluindo `/api/v1/auth/`, `/api/v1/tenants`, `/api/v1/users/` e `/.well-known/jwks.json`) e interfaces web, com controle de vazão (*rate limiting*) e injeção do cabeçalho `X-Correlation-Id`.
 - **Painéis Administrativos Visuais:**
   - **PgAdmin 4** (Web UI do PostgreSQL) na porta `5050`;
   - **Kafka UI** (Web UI do cluster Redpanda) na porta `8090`.
@@ -34,10 +35,10 @@ kit-integracao-infraestrutura/
 ├── frontends/                      # Interfaces estáticas dos 7 domínios do portal
 ├── observabilidade/                # Configurações de Prometheus, Grafana, Loki e Alertmanager
 ├── scripts/
-│   └── init_topics.sh              # Script de provisionamento dos 15 tópicos no Redpanda
+│   └── init_topics.sh              # Script de provisionamento dos 18 tópicos no Redpanda
 ├── services/
 │   ├── common/                     # Módulos Python reutilizáveis (logger JSON, RFC 7807, auth, events)
-│   │   └── CONTRACTS.md            # Catálogo oficial dos 15 eventos e seus envelopes JSON
+│   │   └── CONTRACTS.md            # Catálogo oficial dos 18 eventos e seus envelopes JSON
 │   ├── usuarios-service/           # Esqueleto da API de Autenticação, Usuários e Empresas (:8101)
 │   ├── produtos-service/           # Esqueleto da API de Catálogo de Produtos (:8102)
 │   ├── fornecimentos-service/      # Esqueleto da API de Fornecimento e Estoque (:8103)
@@ -71,13 +72,13 @@ make env
 ```
 
 ### Passo 2: Inicializar a Infraestrutura Base Compartilhada
-Recomendamos inicializar a **infraestrutura base** (Banco, Redpanda, Gateway e Painéis):
+Recomendamos inicializar a **infraestrutura base** (Banco, Redpanda, Redis, Gateway e Painéis):
 ```bash
 make infra-up
 ```
 *Se preferir usar o comando direto do Docker:*
 ```bash
-docker compose up -d pg-primary rp-0 rp-1 rp-2 gateway pgadmin kafka-ui frontends
+docker compose up -d pg-primary rp-0 rp-1 rp-2 redis gateway pgadmin kafka-ui frontends
 # Em seguida, crie os tópicos de mensagens:
 bash ./scripts/init_topics.sh
 ```
@@ -88,7 +89,8 @@ Após a inicialização, abra no seu navegador:
 | Serviço | URL de Acesso Local | Credenciais Padrão (.env) |
 |---|---|---|
 | **Gateway Oficial (Borda)** | `http://localhost:8080` ou `https://localhost:8443` | — (Acesso direto a APIs e Front-ends) |
-| **Kafka UI (Mensageria Redpanda)** | `http://localhost:8090` | Acesso livre (monitora os 15 tópicos em tempo real) |
+| **Kafka UI (Mensageria Redpanda)** | `http://localhost:8090` | Acesso livre (monitora os 18 tópicos em tempo real) |
+| **Redis (Denylist Identity)** | `localhost:6379` | Acesso local na rede `portal-net` (AOF, 256 MB) |
 | **PgAdmin 4 (Web UI do PostgreSQL)**| `http://localhost:5050` | **Login:** `admin@portalb2b.local`<br>**Senha:** `AdminPgLocal123!#` |
 | **PostgreSQL Direto (DBeaver / DataGrip)** | `localhost:5432` | **Banco:** `portal_b2b`<br>**User:** `portal_admin`<br>**Senha:** `AdminMasterPass2026!#` |
 
@@ -173,7 +175,7 @@ Para garantir que o trabalho de uma equipe não quebre o das outras:
 ## 7. Documentação Completa e Detalhada
 
 - Para ler o manual completo de arquitetura com detalhes de BDD, fluxos de negócio, regras de RBAC e LGPD, leia o arquivo [**`ORIENTACOES-ARQUITETURA-GRUPOS.md`**](ORIENTACOES-ARQUITETURA-GRUPOS.md).
-- Para consultar o catálogo dos 15 tópicos e os exemplos de payloads JSON de cada evento, leia o arquivo [**`CONTRACTS.md`**](CONTRACTS.md).
+- Para consultar o catálogo dos 18 tópicos e os exemplos de payloads JSON de cada evento, leia o arquivo [**`CONTRACTS.md`**](CONTRACTS.md).
 
 ---
 

@@ -27,7 +27,9 @@ Todos os eventos emitidos pelos microsserviços utilizam o seguinte envelope est
 
 ---
 
-## 2. Matriz dos 15 Tópicos de Negócio (CT-E08, CT-E09)
+## 2. Matriz dos 18 Tópicos Oficiais (CT-E08, CT-E09)
+
+### 2.1 Tópicos de Negócio (1 a 15)
 
 | # | Nome do Tópico | Serviço Dono (Produtor) | Serviços Consumidores | Chave de Partição (`aggregateId`) |
 |---|---|---|---|---|
@@ -46,6 +48,14 @@ Todos os eventos emitidos pelos microsserviços utilizam o seguinte envelope est
 | 13 | `solicitacao_frete_criada` | `logistica-service` | `transportadoras-service` | `solicitacaoFreteId` |
 | 14 | `cotacao_recebida` | `transportadoras-service` | `logistica-service` | `solicitacaoFreteId` |
 | 15 | `frete_selecionado` | `logistica-service` | `pedidos-service` | `pedidoId` |
+
+### 2.2 Tópicos de Governança e Segurança — Identity-Service (16 a 18, issue #2)
+
+| # | Nome do Tópico | Serviço Dono (Produtor) | Serviços Consumidores | Chave de Partição (`aggregateId`) |
+|---|---|---|---|---|
+| 16 | `tenant_bloqueado` | `usuarios-service` | Serviços de domínio / auditoria | `tenantId` |
+| 17 | `usuario_bloqueado` | `usuarios-service` | Serviços de domínio / auditoria | `usuarioId` |
+| 18 | `sessao_comprometida` | `usuarios-service` | Serviços de domínio / auditoria | `usuarioId` |
 
 ### Tópicos de Falha / Dead Letter (CT-E06)
 Cada serviço consumidor possui seu respectivo tópico DLT para mensagens não processáveis após 3 tentativas:

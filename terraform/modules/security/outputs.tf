@@ -27,3 +27,19 @@ output "ec2_iam_role_arn" {
   description = "ARN da Role IAM das instâncias EC2"
   value       = aws_iam_role.ec2.arn
 }
+
+output "ci_deployer_access_key_id" {
+  description = "Access Key ID do usuário IAM para GitHub Actions"
+  value       = aws_iam_access_key.ci_deployer.id
+}
+
+output "ci_deployer_secret_access_key" {
+  description = "Secret Access Key do usuário IAM para GitHub Actions"
+  value       = aws_iam_access_key.ci_deployer.secret
+  sensitive   = true
+}
+
+output "aws_account_id" {
+  description = "ID da conta AWS atual"
+  value       = data.aws_caller_identity.current.account_id
+}

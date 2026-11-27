@@ -22,3 +22,19 @@ output "database_secret_arn" {
   description = "ARN do segredo de credenciais do banco"
   value       = module.secrets.database_secret_arn
 }
+
+output "ecr_registry_url" {
+  description = "URL base do registro Amazon ECR da conta"
+  value       = "${module.security.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+}
+
+output "ci_deployer_access_key_id" {
+  description = "Access Key ID para configurar nos Secrets do GitHub Actions"
+  value       = module.security.ci_deployer_access_key_id
+}
+
+output "ci_deployer_secret_access_key" {
+  description = "Secret Access Key para configurar nos Secrets do GitHub Actions (use: terraform output -raw ci_deployer_secret_access_key)"
+  value       = module.security.ci_deployer_secret_access_key
+  sensitive   = true
+}

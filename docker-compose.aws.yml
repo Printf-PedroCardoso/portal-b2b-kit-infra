@@ -1,0 +1,186 @@
+# ==============================================================================
+# Docker Compose para Ambiente AWS (EC2 app1 e app2)
+# Utiliza RDS PostgreSQL, EC2 de Mensageria (Redpanda + Redis) e imagens no ECR.
+# ==============================================================================
+
+networks:
+  portal-net:
+    driver: bridge
+    name: portal-net
+
+x-common-env: &common-env
+  DB_HOST: ${RDS_HOST}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_NAME: ${DB_NAME:-portal_b2b}
+  DB_POOL_MIN: "1"
+  DB_POOL_MAX: "5"
+  KAFKA_BOOTSTRAP_SERVERS: ${MSG_PRIVATE_IP}:19092
+  SCHEMA_REGISTRY_URL: http://${MSG_PRIVATE_IP}:18081
+  REDIS_HOST: ${MSG_PRIVATE_IP}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+  JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+  ENVIRONMENT: ${ENVIRONMENT:-integracao}
+
+services:
+  # ----------------------------------------------------------------------------
+  # Borda Local da EC2 (Recebe trafego do ALB na porta 8080)
+  # ----------------------------------------------------------------------------
+  gateway:
+    image: nginx:1.26-alpine
+    container_name: portal-b2b-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./gateway/nginx.aws.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - portal-net
+
+  frontends:
+    build:
+      context: ./frontends
+    container_name: portal-b2b-frontends
+    restart: unless-stopped
+    networks:
+      - portal-net
+
+  # ----------------------------------------------------------------------------
+  # 9 Microsservicos de Dominio (Imagens versionadas no Amazon ECR)
+  # ----------------------------------------------------------------------------
+  usuarios-service:
+    image: ${ECR_REGISTRY}/portal-b2b/usuarios-service:${TAG_USUARIOS_SERVICE:-unconfigured}
+    container_name: usuarios-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: usuarios-service
+      PORT: "8101"
+      DB_USER: svc_usuarios
+      DB_PASSWORD: ${DB_PASS_SVC_USUARIOS}
+      DB_SCHEMA: usuarios
+      DATABASE_URL: postgresql://svc_usuarios:${DB_PASS_SVC_USUARIOS}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  produtos-service:
+    image: ${ECR_REGISTRY}/portal-b2b/produtos-service:${TAG_PRODUTOS_SERVICE:-unconfigured}
+    container_name: produtos-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: produtos-service
+      PORT: "8102"
+      DB_USER: svc_produtos
+      DB_PASSWORD: ${DB_PASS_SVC_PRODUTOS}
+      DB_SCHEMA: produtos
+      DATABASE_URL: postgresql://svc_produtos:${DB_PASS_SVC_PRODUTOS}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  fornecimentos-service:
+    image: ${ECR_REGISTRY}/portal-b2b/fornecimentos-service:${TAG_FORNECIMENTOS_SERVICE:-unconfigured}
+    container_name: fornecimentos-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: fornecimentos-service
+      PORT: "8103"
+      DB_USER: svc_fornecimentos
+      DB_PASSWORD: ${DB_PASS_SVC_FORNECIMENTOS}
+      DB_SCHEMA: fornecimentos
+      DATABASE_URL: postgresql://svc_fornecimentos:${DB_PASS_SVC_FORNECIMENTOS}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  demanda-service:
+    image: ${ECR_REGISTRY}/portal-b2b/demanda-service:${TAG_DEMANDA_SERVICE:-unconfigured}
+    container_name: demanda-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: demanda-service
+      PORT: "8104"
+      DB_USER: svc_demanda
+      DB_PASSWORD: ${DB_PASS_SVC_DEMANDA}
+      DB_SCHEMA: demanda
+      DATABASE_URL: postgresql://svc_demanda:${DB_PASS_SVC_DEMANDA}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  mercado-service:
+    image: ${ECR_REGISTRY}/portal-b2b/mercado-service:${TAG_MERCADO_SERVICE:-unconfigured}
+    container_name: mercado-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: mercado-service
+      PORT: "8105"
+      DB_USER: svc_mercado
+      DB_PASSWORD: ${DB_PASS_SVC_MERCADO}
+      DB_SCHEMA: mercado
+      DATABASE_URL: postgresql://svc_mercado:${DB_PASS_SVC_MERCADO}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  negociacao-service:
+    image: ${ECR_REGISTRY}/portal-b2b/negociacao-service:${TAG_NEGOCIACAO_SERVICE:-unconfigured}
+    container_name: negociacao-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: negociacao-service
+      PORT: "8106"
+      DB_USER: svc_negociacao
+      DB_PASSWORD: ${DB_PASS_SVC_NEGOCIACAO}
+      DB_SCHEMA: negociacao
+      DATABASE_URL: postgresql://svc_negociacao:${DB_PASS_SVC_NEGOCIACAO}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  pedidos-service:
+    image: ${ECR_REGISTRY}/portal-b2b/pedidos-service:${TAG_PEDIDOS_SERVICE:-unconfigured}
+    container_name: pedidos-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: pedidos-service
+      PORT: "8107"
+      DB_USER: svc_pedidos
+      DB_PASSWORD: ${DB_PASS_SVC_PEDIDOS}
+      DB_SCHEMA: pedidos
+      DATABASE_URL: postgresql://svc_pedidos:${DB_PASS_SVC_PEDIDOS}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  logistica-service:
+    image: ${ECR_REGISTRY}/portal-b2b/logistica-service:${TAG_LOGISTICA_SERVICE:-unconfigured}
+    container_name: logistica-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: logistica-service
+      PORT: "8108"
+      DB_USER: svc_logistica
+      DB_PASSWORD: ${DB_PASS_SVC_LOGISTICA}
+      DB_SCHEMA: logistica
+      DATABASE_URL: postgresql://svc_logistica:${DB_PASS_SVC_LOGISTICA}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net
+
+  transportadoras-service:
+    image: ${ECR_REGISTRY}/portal-b2b/transportadoras-service:${TAG_TRANSPORTADORAS_SERVICE:-unconfigured}
+    container_name: transportadoras-service
+    restart: unless-stopped
+    environment:
+      <<: *common-env
+      SERVICE_NAME: transportadoras-service
+      PORT: "8109"
+      DB_USER: svc_transportadoras
+      DB_PASSWORD: ${DB_PASS_SVC_TRANSPORTADORAS}
+      DB_SCHEMA: transportadoras
+      DATABASE_URL: postgresql://svc_transportadoras:${DB_PASS_SVC_TRANSPORTADORAS}@${RDS_HOST}:${DB_PORT:-5432}/${DB_NAME:-portal_b2b}
+    networks:
+      - portal-net

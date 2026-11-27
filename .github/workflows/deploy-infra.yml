@@ -39,7 +39,7 @@ jobs:
             --targets "Key=tag:Ambiente,Values=${ENVIRONMENT}" "Key=tag:Role,Values=Application" \
             --comment "Sync Infra/Gateway (GitHub Actions)" \
             --parameters 'commands=[
-              "set -euo pipefail",
+              "set -eu",
               "cd /opt/portal-b2b",
               "git pull --ff-only",
               "chmod +x scripts/aws-*.sh",

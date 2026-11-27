@@ -1,0 +1,136 @@
+# ==============================================================================
+# Economia de Creditos AWS — Stop (00:00 BRT) e Start (09:50 BRT -> pronto 10:00)
+# Para e inicia as EC2 (app1, app2, msg) e o RDS do ambiente de integracao.
+# Tambem permite acionar manualmente via aba Actions -> Run workflow.
+# ==============================================================================
+
+name: Agendamento Stop/Start AWS (Integracao)
+
+on:
+  schedule:
+    # 00:00 Horario de Brasilia (UTC-3) = 03:00 UTC
+    - cron: "0 3 * * *"
+    # 09:50 Horario de Brasilia (UTC-3) = 12:50 UTC (RDS + msg sobem antes de app1/app2)
+    - cron: "50 12 * * *"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Acao manual desejada"
+        required: true
+        type: choice
+        options:
+          - start
+          - stop
+
+env:
+  AWS_REGION: us-east-2
+  ENVIRONMENT: integracao
+  RDS_IDENTIFIER: portal-b2b-integracao-rds
+
+jobs:
+  power-manage:
+    name: Gerenciar Energia das Instancias
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determinar acao (start ou stop)
+        id: decide
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ACTION="${{ inputs.action }}"
+          elif [[ "${{ github.event.schedule }}" == "0 3 * * *" ]]; then
+            ACTION="stop"
+          else
+            ACTION="start"
+          fi
+          echo "action=${ACTION}" >> "$GITHUB_OUTPUT"
+          echo "==> Acao selecionada: ${ACTION}"
+
+      - name: Configurar credenciais AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Parar EC2 e RDS (00:00 BRT)
+        if: steps.decide.outputs.action == 'stop'
+        run: |
+          echo "==> Buscando EC2 em execucao no ambiente ${ENVIRONMENT}..."
+          EC2_IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Ambiente,Values=${ENVIRONMENT}" "Name=instance-state-name,Values=running" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+
+          if [[ -n "${EC2_IDS}" ]]; then
+            echo "==> Parando EC2: ${EC2_IDS}"
+            aws ec2 stop-instances --instance-ids ${EC2_IDS}
+          else
+            echo "==> Nenhuma EC2 em execucao para parar."
+          fi
+
+          RDS_STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "${RDS_IDENTIFIER}" \
+            --query "DBInstances[0].DBInstanceStatus" \
+            --output text)
+          echo "==> Status atual do RDS (${RDS_IDENTIFIER}): ${RDS_STATUS}"
+
+          if [[ "${RDS_STATUS}" == "available" ]]; then
+            echo "==> Parando RDS ${RDS_IDENTIFIER}..."
+            aws rds stop-db-instance --db-instance-identifier "${RDS_IDENTIFIER}"
+          else
+            echo "==> RDS nao esta em estado 'available' (${RDS_STATUS}); pulando stop."
+          fi
+
+      - name: Iniciar RDS e EC2 na ordem correta (09:50 BRT)
+        if: steps.decide.outputs.action == 'start'
+        run: |
+          # 1. Inicia o RDS primeiro (leva ~5 min)
+          RDS_STATUS=$(aws rds describe-db-instances \
+            --db-instance-identifier "${RDS_IDENTIFIER}" \
+            --query "DBInstances[0].DBInstanceStatus" \
+            --output text)
+          echo "==> Status atual do RDS (${RDS_IDENTIFIER}): ${RDS_STATUS}"
+
+          if [[ "${RDS_STATUS}" == "stopped" ]]; then
+            echo "==> Iniciando RDS ${RDS_IDENTIFIER}..."
+            aws rds start-db-instance --db-instance-identifier "${RDS_IDENTIFIER}"
+          fi
+
+          # 2. Inicia a EC2 de mensageria (Redpanda + Redis)
+          MSG_IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Ambiente,Values=${ENVIRONMENT}" "Name=tag:Role,Values=Messaging" "Name=instance-state-name,Values=stopped" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+          if [[ -n "${MSG_IDS}" ]]; then
+            echo "==> Iniciando EC2 de mensageria: ${MSG_IDS}"
+            aws ec2 start-instances --instance-ids ${MSG_IDS}
+          fi
+
+          # 3. Aguarda o RDS ficar disponivel (timeout ~10 min) antes de subir app1/app2
+          echo "==> Aguardando RDS ficar 'available'..."
+          for i in $(seq 1 20); do
+            STATUS=$(aws rds describe-db-instances \
+              --db-instance-identifier "${RDS_IDENTIFIER}" \
+              --query "DBInstances[0].DBInstanceStatus" \
+              --output text)
+            echo "[Tentativa ${i}/20] RDS status: ${STATUS}"
+            if [[ "${STATUS}" == "available" ]]; then
+              break
+            fi
+            sleep 30
+          done
+
+          # 4. Inicia app1 e app2 (containers voltam sozinhos via restart: unless-stopped)
+          APP_IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:Ambiente,Values=${ENVIRONMENT}" "Name=tag:Role,Values=Application" "Name=instance-state-name,Values=stopped" \
+            --query "Reservations[].Instances[].InstanceId" \
+            --output text)
+          if [[ -n "${APP_IDS}" ]]; then
+            echo "==> Iniciando EC2 de aplicacao (app1/app2): ${APP_IDS}"
+            aws ec2 start-instances --instance-ids ${APP_IDS}
+          else
+            echo "==> EC2 de aplicacao ja estao ligadas."
+          fi
+
+          echo "==> Ambiente ${ENVIRONMENT} iniciado com sucesso!"

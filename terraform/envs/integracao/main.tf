@@ -75,6 +75,7 @@ module "rds" {
   security_group_id       = module.security.rds_security_group_id
   allocated_storage       = 50
   max_allocated_storage   = 200
+  multi_az                = false # Economia de creditos em integracao; voltar para true na entrega/INF-06
   backup_retention_period = 7
   deletion_protection     = false
   skip_final_snapshot     = true

@@ -88,6 +88,36 @@ resource "aws_iam_policy" "ci_deployer" {
           "ec2:DescribeInstances"
         ]
         Resource = "*"
+      },
+      # 6. Stop/Start agendado das EC2 do ambiente (economia de creditos)
+      {
+        Sid    = "EC2StopStartEnvironment"
+        Effect = "Allow"
+        Action = [
+          "ec2:StartInstances",
+          "ec2:StopInstances"
+        ]
+        Resource = [
+          "arn:aws:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Ambiente" = var.environment
+          }
+        }
+      },
+      # 7. Stop/Start agendado do RDS do ambiente (economia de creditos)
+      {
+        Sid    = "RDSStopStartEnvironment"
+        Effect = "Allow"
+        Action = [
+          "rds:StartDBInstance",
+          "rds:StopDBInstance",
+          "rds:DescribeDBInstances"
+        ]
+        Resource = [
+          "arn:aws:rds:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:db:${var.project_name}-${var.environment}-rds"
+        ]
       }
     ]
   })

@@ -412,7 +412,7 @@ $$\text{Rede} \longrightarrow \text{RDS PostgreSQL} \longrightarrow \text{Redpan
 flowchart TD
   Step1["1. Declaração do Incidente\n(Líder de Infraestrutura assume o comando)"] --> Step2["2. Restauração da Rede (VPC, Subnets, SGs, Rotas)\n`terraform apply -target=module.network`"]
   Step2 --> Step3["3. Restauração do RDS Multi-AZ\nPoint-in-Time Recovery ou Snapshot Recente\nValidação de Schemas e Roles"]
-  Step3 --> Step4["4. Restauração do Cluster Redpanda\nSubida dos 3 brokers (rp-0, rp-1, rp-2)\nCriação dos 15 tópicos e validação do ISR=3"]
+  Step3 --> Step4["4. Restauração do Cluster Redpanda e Redis\nSubida dos 3 brokers (rp-0, rp-1, rp-2) e Redis\nCriação dos 18 tópicos e validação do ISR=3"]
   Step4 --> Step5["5. Deploy das Instâncias de Aplicação\nExecução dos Jobs de Migração (portal_ddl)\nSubida dos 9 microsserviços e 7 front-ends"]
   Step5 --> Step6["6. Habilitação do ALB e Verificação de Borda\nChecagem profunda /health/ready\nLiberação do DNS Route 53"]
   Step6 --> Step7["7. Encerramento do Incidente e Post-Mortem\nEmissão de relatório técnico"]
@@ -442,7 +442,7 @@ flowchart TD
      ```bash
      rpk cluster info --brokers localhost:19092
      ```
-   - Executar o job de criação e verificação dos 15 tópicos de negócio com fator de replicação 3 e particionamento configurado.
+   - Executar o job de criação e verificação dos **18 tópicos oficiais** (15 de negócio + 3 de governança do Identity-Service) com fator de replicação 3 e particionamento configurado, além de validar o serviço Redis (`6379`) na instância `compute_msg`.
 5. **Deploy das Aplicações e Migrações:**
    - Executar os jobs de migração com a role `portal_ddl` para assegurar que todos os 9 schemas estejam íntegros.
    - Inicializar os containers de aplicação via `scripts/deploy.sh`.
@@ -540,9 +540,9 @@ Em estrito cumprimento à regra **R10**, apresenta-se a relação dos identifica
 - **Decisões e Pendências Consolidadas (D):** `D-01` a `D-19`.
 - **Premissas Assumidas:** `PA-01` a `PA-15`.
 
-### IDs Não Cobertos Diretamente Nesta Etapa (Destinados à Implementação de Código nas Etapas 2 e 4)
-- *Código Terraform concreto:* Transferido para a **Etapa 2** (`saida/02-terraform/`).
-- *Implementação de APIs, Front-ends e PoC:* Transferidos para a **Etapa 4** (`saida/04-poc/` - `RF-01` a `RF-18`, `SW-01` a `SW-08`, `CT-A01` a `CT-A08`, `CT-E01` a `CT-E09`).
+### IDs Não Cobertos Diretamente Nesta Etapa (Destinados à Implementação de Código)
+- *Código Terraform concreto:* Implementado em [`terraform/`](../terraform/).
+- *Implementação de APIs, Front-ends e Ambiente Local:* Implementados na raiz do repositório ([`docker-compose.yml`](../docker-compose.yml), [`services/`](../services/), [`gateway/`](../gateway/), [`frontends/`](../frontends/) — `RF-01` a `RF-18`, `SW-01` a `SW-08`, `CT-A01` a `CT-A08`, `CT-E01` a `CT-E09`).
 - *Critérios de Aceite Globais (CA):* Validados na matriz de rastreabilidade e na suíte de testes automatizados das Etapas 4 e 5.
 
 *(Observação: Em conformidade com a Regra R11, nenhuma nota ou porcentagem de conformidade foi atribuída nesta autoverificação).*

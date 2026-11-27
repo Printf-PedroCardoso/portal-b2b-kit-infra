@@ -30,9 +30,11 @@ kit-integracao-infraestrutura/
 │   ├── modules/                    # Módulos Terraform (network, security, compute_app, compute_msg, rds, alb, ...)
 │   ├── scripts/                    # Scripts de bootstrap EC2 (user_data_app.sh, user_data_msg.sh)
 │   └── README.md                   # Guia de provisionamento Terraform na AWS
-├── docs/                           # Documentação técnica da arquitetura AWS
+├── docs/                           # Documentação técnica, requisitos e grupos do projeto
 │   ├── arquitetura-aws.md          # Especificação completa da arquitetura em nuvem
-│   └── guia-iniciante-aws.md       # Guia passo a passo para operar o ambiente AWS
+│   ├── guia-iniciante-aws.md       # Guia passo a passo para operar o ambiente AWS
+│   ├── 03-REQUISITOS-PORTAL-B2B-v1.0.md # Especificação de requisitos do Portal B2B
+│   └── grupos_trabalho.md          # Lista oficial de grupos e atribuições
 ├── database/
 │   └── 01-init.sql                 # Script de criação dos 9 schemas e roles no PostgreSQL
 ├── gateway/
@@ -184,6 +186,9 @@ Para garantir que o trabalho de uma equipe não quebre o das outras:
 
 - Para ler o manual completo de arquitetura com detalhes de BDD, fluxos de negócio, regras de RBAC e LGPD, leia o arquivo [**`ORIENTACOES-ARQUITETURA-GRUPOS.md`**](ORIENTACOES-ARQUITETURA-GRUPOS.md).
 - Para consultar o catálogo dos 18 tópicos e os exemplos de payloads JSON de cada evento, leia o arquivo [**`CONTRACTS.md`**](CONTRACTS.md).
+- Para consultar os requisitos oficiais e a divisão das equipes do projeto, leia:
+  - [**`docs/03-REQUISITOS-PORTAL-B2B-v1.0.md`**](docs/03-REQUISITOS-PORTAL-B2B-v1.0.md) — especificação completa de requisitos do Portal B2B;
+  - [**`docs/grupos_trabalho.md`**](docs/grupos_trabalho.md) — lista de grupos de trabalho e integrantes.
 - Para consultar a especificação da infraestrutura em nuvem AWS e o guia de operação, veja:
   - [**`terraform/README.md`**](terraform/README.md) — módulos Terraform, pré-requisitos e comandos de `plan`/`apply`;
   - [**`docs/arquitetura-aws.md`**](docs/arquitetura-aws.md) — arquitetura detalhada na AWS;

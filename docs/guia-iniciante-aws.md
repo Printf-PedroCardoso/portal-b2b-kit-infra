@@ -426,4 +426,4 @@ Abaixo listamos as mensagens de erro mais frequentes enfrentadas por quem está 
 
 Parabéns! Agora você compreende a lógica, os comandos, a governança de custos e a resolução de problemas em ambientes de nuvem com Terraform.
 
-Quando estiver pronto para ver os 9 microsserviços, o cluster Redpanda e as interfaces rodando juntos na sua máquina local com um único comando, avance para a **Etapa 4: Prova de Conceito (PoC Local)**!
+Quando estiver pronto para ver os 9 microsserviços, o cluster Redpanda (18 tópicos), o Redis e as interfaces rodando juntos na sua máquina local com um único comando, siga o guia rápido no [**`README.md`**](../README.md) da raiz do repositório!

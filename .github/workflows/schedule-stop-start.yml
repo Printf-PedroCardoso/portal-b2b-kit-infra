@@ -26,6 +26,9 @@ env:
   AWS_REGION: us-east-2
   ENVIRONMENT: integracao
   RDS_IDENTIFIER: portal-b2b-integracao-rds
+  # Enquanto estiver em desenvolvimento, liga apenas app1 (app2 fica parada economizando creditos).
+  # Para voltar ao ativo-ativo na entrega/testes de carga, troque para: app1,app2
+  ACTIVE_APP_NODES: app1
 
 jobs:
   power-manage:
@@ -121,16 +124,16 @@ jobs:
             sleep 30
           done
 
-          # 4. Inicia app1 e app2 (containers voltam sozinhos via restart: unless-stopped)
+          # 4. Inicia apenas os nos de aplicacao ativos (padrao: app1; app2 fica parada para economia)
           APP_IDS=$(aws ec2 describe-instances \
-            --filters "Name=tag:Ambiente,Values=${ENVIRONMENT}" "Name=tag:Role,Values=Application" "Name=instance-state-name,Values=stopped" \
+            --filters "Name=tag:Ambiente,Values=${ENVIRONMENT}" "Name=tag:Role,Values=Application" "Name=tag:Node,Values=${ACTIVE_APP_NODES}" "Name=instance-state-name,Values=stopped" \
             --query "Reservations[].Instances[].InstanceId" \
             --output text)
           if [[ -n "${APP_IDS}" ]]; then
-            echo "==> Iniciando EC2 de aplicacao (app1/app2): ${APP_IDS}"
+            echo "==> Iniciando EC2 de aplicacao (${ACTIVE_APP_NODES}): ${APP_IDS}"
             aws ec2 start-instances --instance-ids ${APP_IDS}
           else
-            echo "==> EC2 de aplicacao ja estao ligadas."
+            echo "==> EC2 de aplicacao (${ACTIVE_APP_NODES}) ja estao ligadas."
           fi
 
           echo "==> Ambiente ${ENVIRONMENT} iniciado com sucesso!"
